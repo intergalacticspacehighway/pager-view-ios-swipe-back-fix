@@ -17,6 +17,7 @@ function HomeScreen({ navigation }) {
 }
 
 function ProfileScreen() {
+  // return <View style={{ flex: 1, backgroundColor: "pink" }} />;
   return (
     <PagerView style={styles.pagerView} initialPage={0}>
       <View key="1">
@@ -34,7 +35,11 @@ const Stack = createNativeStackNavigator();
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator>
+      <Stack.Navigator
+        screenOptions={{
+          fullScreenGestureEnabled: true,
+        }}
+      >
         <Stack.Screen name="home" component={HomeScreen} />
         <Stack.Screen name="profile" component={ProfileScreen} />
       </Stack.Navigator>
