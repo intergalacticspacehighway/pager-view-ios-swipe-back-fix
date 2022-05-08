@@ -1,5 +1,5 @@
 diff --git a/node_modules/react-native-screens/ios/RNSScreenStack.m b/node_modules/react-native-screens/ios/RNSScreenStack.m
-index ec56020..347077b 100644
+index ec56020..bfbf0f8 100644
 --- a/node_modules/react-native-screens/ios/RNSScreenStack.m
 +++ b/node_modules/react-native-screens/ios/RNSScreenStack.m
 @@ -10,6 +10,7 @@
@@ -10,7 +10,16 @@ index ec56020..347077b 100644
  
  @interface RNSScreenStackView () <
      UINavigationControllerDelegate,
-@@ -559,6 +560,9 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+@@ -20,6 +21,8 @@ @interface RNSScreenStackView () <
+ @property (nonatomic) NSMutableArray<UIViewController *> *presentedModals;
+ @property (nonatomic) BOOL updatingModals;
+ @property (nonatomic) BOOL scheduleModalsUpdate;
++@property (nonatomic) ReactNativePageView* pageView;
++@property (nonatomic) BOOL pageViewScrollChanged;
+ 
+ @end
+ 
+@@ -559,6 +562,9 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
      return NO;
    }
  
@@ -20,18 +29,35 @@ index ec56020..347077b 100644
  #if TARGET_OS_TV
    [self cancelTouchesInParent];
    return YES;
-@@ -602,6 +606,23 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+@@ -602,6 +608,40 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
  #endif
  }
  
 +- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
 +    
-+        if ([otherGestureRecognizer isKindOfClass: NSClassFromString(@"UIScrollViewPanGestureRecognizer")] && [otherGestureRecognizer.view.reactViewController isKindOfClass: [UIPageViewController class]]){
++    bool isBackGesture = false;
++    // determine if fullScreen gesture is swiping back
++    if ([gestureRecognizer isKindOfClass: [RNSPanGestureRecognizer class]] ) {
++        RNSPanGestureRecognizer *pan = (RNSPanGestureRecognizer*) gestureRecognizer;
++
++        CGPoint translation = [pan translationInView:_controller.view];
++        isBackGesture = translation.x > 0;
++    }
++    
++        if ([otherGestureRecognizer isKindOfClass: NSClassFromString(@"UIScrollViewPanGestureRecognizer")] && [otherGestureRecognizer.view.reactViewController isKindOfClass: [UIPageViewController class]]
++            && isBackGesture
++            ){
 +            
 +            UIPageViewController* pageController = otherGestureRecognizer.view.reactViewController;
 +            if (pageController != nil && [pageController.delegate isKindOfClass:[ReactNativePageView class]]) {
 +                ReactNativePageView* page = pageController.delegate;
 +                if (page != nil && page.currentIndex == 0) {
++                    if (page.scrollEnabled) {
++                        _pageView = page;
++                        [_pageView shouldScroll: false];
++                        _pageViewScrollChanged = true;
++                    }
++                    
 +                    return YES;
 +                }
 +        }
@@ -44,3 +70,17 @@ index ec56020..347077b 100644
  #if !TARGET_OS_TV
  - (void)setupGestureHandlers
  {
+@@ -661,7 +701,13 @@ - (void)handleSwipe:(UIPanGestureRecognizer *)gestureRecognizer
+       BOOL shouldFinishTransition = (translation + velocity * 0.3) > (distance / 2);
+       if (shouldFinishTransition) {
+         [_interactionController finishInteractiveTransition];
++          _pageView = nil;
+       } else {
++          if (_pageView != nil && _pageViewScrollChanged) {
++              [_pageView shouldScroll: true];
++              _pageViewScrollChanged = false;
++          }
++          
+         [_interactionController cancelInteractiveTransition];
+       }
+       _interactionController = nil;
