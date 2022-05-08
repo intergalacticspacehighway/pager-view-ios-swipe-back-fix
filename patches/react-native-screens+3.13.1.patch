@@ -1,5 +1,5 @@
 diff --git a/node_modules/react-native-screens/ios/RNSScreenStack.m b/node_modules/react-native-screens/ios/RNSScreenStack.m
-index 47c8f8d..d1aeee5 100644
+index 47c8f8d..40cd260 100644
 --- a/node_modules/react-native-screens/ios/RNSScreenStack.m
 +++ b/node_modules/react-native-screens/ios/RNSScreenStack.m
 @@ -10,6 +10,7 @@
@@ -19,31 +19,54 @@ index 47c8f8d..d1aeee5 100644
  
  @end
  
-@@ -594,6 +597,10 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+@@ -119,6 +122,20 @@ - (void)navigationController:(UINavigationController *)navigationController
+       break;
+     }
+   }
++    
++    id<UIViewControllerTransitionCoordinator> tc = navigationController.topViewController.transitionCoordinator;
++            [tc notifyWhenInteractionEndsUsingBlock:^(id<UIViewControllerTransitionCoordinatorContext> context) {
++                if ([context isCancelled]) {
++                    if (self.pageView!= nil && self.pageViewScrollChanged) {
++                        [self.pageView shouldScroll: true];
++                    }
++                }
++                self.pageViewScrollChanged = false;
++                self.pageView = nil;
++            }];
++             
++    
++    
+   [RNSScreenStackHeaderConfig willShowViewController:viewController animated:animated withConfig:config];
+ }
+ 
+@@ -594,6 +611,10 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
      return NO;
    }
  
-+  if ([gestureRecognizer isKindOfClass:[_controller.interactivePopGestureRecognizer class]]) {
++  if (gestureRecognizer == _controller.interactivePopGestureRecognizer) {
 +    return YES;
 +  }
-+
++    
  #if TARGET_OS_TV
    [self cancelTouchesInParent];
    return YES;
-@@ -637,6 +644,40 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+@@ -637,6 +658,44 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
  #endif
  }
  
-+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
 +
-+    bool isBackGesture = false;
-+    // determine if fullScreen gesture is swiping back
-+    if ([gestureRecognizer isKindOfClass: [RNSPanGestureRecognizer class]] ) {
++- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
++    
++
++    BOOL isBackGesture = false;
++    // full screen swipe gesture handler
++    if ([gestureRecognizer isKindOfClass: [RNSPanGestureRecognizer class]]) {
 +        RNSPanGestureRecognizer *pan = (RNSPanGestureRecognizer*) gestureRecognizer;
 +
 +        CGPoint translation = [pan translationInView:_controller.view];
 +        isBackGesture = translation.x > 0;
-+    }
++    
 +
 +        if ([otherGestureRecognizer isKindOfClass: NSClassFromString(@"UIScrollViewPanGestureRecognizer")] && [otherGestureRecognizer.view.reactViewController isKindOfClass: [UIPageViewController class]]
 +            && isBackGesture
@@ -61,7 +84,9 @@ index 47c8f8d..d1aeee5 100644
 +
 +                    return YES;
 +                }
++            }
 +        }
++        
 +    }
 +
 +    return NO;
@@ -71,16 +96,3 @@ index 47c8f8d..d1aeee5 100644
  #if !TARGET_OS_TV
  - (void)setupGestureHandlers
  {
-@@ -706,7 +747,12 @@ - (void)handleSwipe:(UIPanGestureRecognizer *)gestureRecognizer
-       BOOL shouldFinishTransition = (translation + velocity * 0.3) > (distance / 2);
-       if (shouldFinishTransition) {
-         [_interactionController finishInteractiveTransition];
-+          _pageView = nil;
-       } else {
-+        if (_pageView != nil && _pageViewScrollChanged) {
-+            [_pageView shouldScroll: true];
-+            _pageViewScrollChanged = false;
-+        }
-         [_interactionController cancelInteractiveTransition];
-       }
-       _interactionController = nil;
