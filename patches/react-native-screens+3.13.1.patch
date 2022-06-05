@@ -1,5 +1,5 @@
 diff --git a/node_modules/react-native-screens/ios/RNSScreenStack.m b/node_modules/react-native-screens/ios/RNSScreenStack.m
-index 47c8f8d..40cd260 100644
+index 47c8f8d..c23dfeb 100644
 --- a/node_modules/react-native-screens/ios/RNSScreenStack.m
 +++ b/node_modules/react-native-screens/ios/RNSScreenStack.m
 @@ -10,6 +10,7 @@
@@ -65,7 +65,7 @@ index 47c8f8d..40cd260 100644
 +        RNSPanGestureRecognizer *pan = (RNSPanGestureRecognizer*) gestureRecognizer;
 +
 +        CGPoint translation = [pan translationInView:_controller.view];
-+        isBackGesture = translation.x > 0;
++        isBackGesture = translation.x > 0 && _controller.viewControllers.count > 1;
 +    
 +
 +        if ([otherGestureRecognizer isKindOfClass: NSClassFromString(@"UIScrollViewPanGestureRecognizer")] && [otherGestureRecognizer.view.reactViewController isKindOfClass: [UIPageViewController class]]
