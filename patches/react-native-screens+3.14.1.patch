@@ -1,8 +1,47 @@
 diff --git a/node_modules/react-native-screens/ios/RNSScreenStack.mm b/node_modules/react-native-screens/ios/RNSScreenStack.mm
-index 67d8e89..47207ef 100644
+index 67d8e89..63715c7 100644
 --- a/node_modules/react-native-screens/ios/RNSScreenStack.mm
 +++ b/node_modules/react-native-screens/ios/RNSScreenStack.mm
-@@ -600,20 +600,14 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+@@ -23,6 +23,7 @@
+ #import "RNSScreenStackAnimator.h"
+ #import "RNSScreenStackHeaderConfig.h"
+ #import "RNSScreenWindowTraits.h"
++#import "ReactNativePageView.h"
+ 
+ @interface RNSScreenStackView () <
+     UINavigationControllerDelegate,
+@@ -38,6 +39,9 @@ @interface RNSScreenStackView () <
+ @property (nonatomic) NSMutableArray<UIViewController *> *presentedModals;
+ @property (nonatomic) BOOL updatingModals;
+ @property (nonatomic) BOOL scheduleModalsUpdate;
++@property (nonatomic, nullable) ReactNativePageView* pageView;
++@property (nonatomic) BOOL pageViewScrollChanged;
++
+ 
+ @end
+ 
+@@ -174,6 +178,20 @@ - (void)navigationController:(UINavigationController *)navigationController
+       break;
+     }
+   }
++      
++    id<UIViewControllerTransitionCoordinator> tc = navigationController.topViewController.transitionCoordinator;
++                [tc notifyWhenInteractionEndsUsingBlock:^(id<UIViewControllerTransitionCoordinatorContext> context) {
++                    if ([context isCancelled]) {
++                        if (self.pageView!= nil && self.pageViewScrollChanged) {
++                            [self.pageView shouldScroll: true];
++                        }
++                    }
++                    self.pageViewScrollChanged = false;
++                    self.pageView = nil;
++                }];
++    
++    
++    
+   [RNSScreenStackHeaderConfig willShowViewController:viewController animated:animated withConfig:config];
+ }
+ 
+@@ -600,20 +618,14 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
  {
    RNSScreenView *topScreen = (RNSScreenView *)_controller.viewControllers.lastObject.view;
  
@@ -27,7 +66,7 @@ index 67d8e89..47207ef 100644
        _isFullWidthSwiping = YES;
        [self cancelTouchesInParent];
        return YES;
-@@ -621,6 +615,7 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+@@ -621,6 +633,7 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
      return NO;
    }
  
@@ -35,7 +74,7 @@ index 67d8e89..47207ef 100644
    if (topScreen.customAnimationOnSwipe && [RNSScreenStackAnimator isCustomAnimation:topScreen.stackAnimation]) {
      if ([gestureRecognizer isKindOfClass:[RNSScreenEdgeGestureRecognizer class]]) {
        // if we do not set any explicit `semanticContentAttribute`, it is `UISemanticContentAttributeUnspecified` instead
-@@ -639,10 +634,8 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+@@ -639,10 +652,8 @@ - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
      if ([gestureRecognizer isKindOfClass:[RNSScreenEdgeGestureRecognizer class]]) {
        // it should only recognize with `customAnimationOnSwipe` set
        return NO;
@@ -47,7 +86,7 @@ index 67d8e89..47207ef 100644
      [self cancelTouchesInParent];
      return YES;
    }
-@@ -807,6 +800,8 @@ - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event
+@@ -807,6 +818,8 @@ - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event
    return [super hitTest:point withEvent:event];
  }
  
@@ -56,7 +95,7 @@ index 67d8e89..47207ef 100644
  - (BOOL)isScrollViewPanGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
  {
    // NOTE: This hack is required to restore native behavior of edge swipe (interactive pop gesture)
-@@ -819,18 +814,55 @@ - (BOOL)isScrollViewPanGestureRecognizer:(UIGestureRecognizer *)gestureRecognize
+@@ -819,18 +832,88 @@ - (BOOL)isScrollViewPanGestureRecognizer:(UIGestureRecognizer *)gestureRecognize
    return scrollView.panGestureRecognizer == gestureRecognizer;
  }
  
@@ -85,6 +124,39 @@ index 67d8e89..47207ef 100644
      shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
  {
 -  return [self isScrollViewPanGestureRecognizer:otherGestureRecognizer];
++        
++        BOOL isBackGesture = false;
++        // full screen swipe gesture handler
++        if ([gestureRecognizer isKindOfClass: [RNSPanGestureRecognizer class]]) {
++            RNSPanGestureRecognizer *pan = (RNSPanGestureRecognizer*) gestureRecognizer;
++
++            CGPoint translation = [pan translationInView:_controller.view];
++            isBackGesture = translation.x > 0 && _controller.viewControllers.count > 1;
++
++
++            if ([otherGestureRecognizer isKindOfClass: NSClassFromString(@"UIScrollViewPanGestureRecognizer")] && [otherGestureRecognizer.view.reactViewController isKindOfClass: [UIPageViewController class]]
++                && isBackGesture
++                ){
++
++                UIPageViewController* pageController = otherGestureRecognizer.view.reactViewController;
++                if (pageController != nil && [pageController.delegate isKindOfClass:[ReactNativePageView class]]) {
++                    ReactNativePageView* page = (ReactNativePageView*) pageController.delegate;
++                    if (page != nil && page.currentIndex == 0) {
++                        if (page.scrollEnabled) {
++                            _pageView = page;
++                            [_pageView shouldScroll: false];
++                            _pageViewScrollChanged = true;
++                        }
++
++                        return YES;
++                    }
++                }
++            }
++
++        }
++    
++    
++ 
 +  if ([gestureRecognizer isKindOfClass:[RNSPanGestureRecognizer class]] &&
 +      [self isScrollViewPanGestureRecognizer:otherGestureRecognizer]) {
 +    RNSPanGestureRecognizer *panGestureRecognizer = (RNSPanGestureRecognizer *)gestureRecognizer;
