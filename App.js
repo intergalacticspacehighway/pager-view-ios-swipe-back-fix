@@ -1,8 +1,9 @@
-import React from "react";
-import { StyleSheet, View, Text, Button } from "react-native";
+import React, {useRef} from "react";
+import { StyleSheet, View, Text, Button,ScrollView } from "react-native";
 import PagerView from "react-native-pager-view";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { GestureDetector, Gesture } from "react-native-gesture-handler";
 
 function HomeScreen({ navigation }) {
   return (
@@ -17,15 +18,17 @@ function HomeScreen({ navigation }) {
 }
 
 function ProfileScreen() {
+
+  
   return (
-    <PagerView style={styles.pagerView} initialPage={0}>
-      <View key="1">
-        <Text>First page</Text>
-      </View>
-      <View key="2">
-        <Text>Second page</Text>
-      </View>
-    </PagerView>
+      <PagerView style={styles.pagerView}   initialPage={0} >
+        <View key="1">
+          <Text>First page</Text>
+        </View>
+        <View key="2">
+          <Text>Second page</Text>
+        </View>
+      </PagerView>
   );
 }
 
@@ -34,7 +37,7 @@ const Stack = createNativeStackNavigator();
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator>
+      <Stack.Navigator screenOptions={{ fullScreenGestureEnabled: true }}>
         <Stack.Screen name="home" component={HomeScreen} />
         <Stack.Screen name="profile" component={ProfileScreen} />
       </Stack.Navigator>
