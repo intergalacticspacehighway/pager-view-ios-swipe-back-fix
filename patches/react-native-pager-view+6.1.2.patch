@@ -1,5 +1,5 @@
 diff --git a/node_modules/react-native-pager-view/ios/ReactNativePageView.m b/node_modules/react-native-pager-view/ios/ReactNativePageView.m
-index eacfbe8..ceff63c 100644
+index cf2bd57..350d9b8 100644
 --- a/node_modules/react-native-pager-view/ios/ReactNativePageView.m
 +++ b/node_modules/react-native-pager-view/ios/ReactNativePageView.m
 @@ -9,7 +9,7 @@
@@ -10,41 +10,46 @@ index eacfbe8..ceff63c 100644
 +@interface ReactNativePageView () <UIPageViewControllerDataSource, UIPageViewControllerDelegate, UIScrollViewDelegate, UIGestureRecognizerDelegate>
  
  @property(nonatomic, strong) UIPageViewController *reactPageViewController;
- @property(nonatomic, strong) UIPageControl *reactPageIndicatorView;
-@@ -82,6 +82,11 @@ - (void)didMoveToWindow {
+ @property(nonatomic, strong) RCTEventDispatcher *eventDispatcher;
+@@ -80,6 +80,11 @@
          [self setupInitialController];
      }
- 
-+    UIPanGestureRecognizer* gesture = [UIPanGestureRecognizer new];
+     
++    UIPanGestureRecognizer* panGestureRecognizer = [UIPanGestureRecognizer new];
++    self.panGestureRecognizer = panGestureRecognizer;
++    panGestureRecognizer.delegate = self;
++    [self addGestureRecognizer: panGestureRecognizer];
 +
-+    gesture.delegate = self;
-+    [self addGestureRecognizer: gesture];
-+ 
      if (self.reactViewController.navigationController != nil && self.reactViewController.navigationController.interactivePopGestureRecognizer != nil) {
          [self.scrollView.panGestureRecognizer requireGestureRecognizerToFail:self.reactViewController.navigationController.interactivePopGestureRecognizer];
      }
-@@ -494,4 +499,24 @@ - (NSString *)determineScrollDirection:(UIScrollView *)scrollView {
+@@ -461,4 +466,29 @@
  - (BOOL)isLtrLayout {
      return [_layoutDirection isEqualToString:@"ltr"];
  }
 +
++
++// The below snippet disables the pager view's scrollview's scroll when current index is 0 and user is swiping back. Useful for fullScreenGestureEnabled in RN Screens
 +- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
-+    if (otherGestureRecognizer == self.scrollView.panGestureRecognizer) {
-+        UIPanGestureRecognizer* p = (UIPanGestureRecognizer*) gestureRecognizer;
-+        CGPoint velocity = [p velocityInView:self];
-+        if (self.currentIndex == 0 && velocity.x > 0) {
++
++    // Recognize simultaneously only if the other gesture is RN Screen's pan gesture (one that is used to perform fullScreenGestureEnabled)
++    if (gestureRecognizer == self.panGestureRecognizer && [NSStringFromClass([otherGestureRecognizer class]) isEqual: @"RNSPanGestureRecognizer"]) {
++        UIPanGestureRecognizer* panGestureRecognizer = (UIPanGestureRecognizer*) gestureRecognizer;
++        CGPoint velocity = [panGestureRecognizer velocityInView:self];
++        BOOL isLTR = [self isLtrLayout];
++        BOOL isBackGesture = (isLTR && velocity.x > 0) || (!isLTR && velocity.x < 0);
++        
++        if (self.currentIndex == 0 && isBackGesture) {
 +            self.scrollView.panGestureRecognizer.enabled = false;
-+            return NO;
 +        } else {
 +            self.scrollView.panGestureRecognizer.enabled = self.scrollEnabled;
 +        }
-+    } else {
-+        self.scrollView.panGestureRecognizer.enabled = self.scrollEnabled;
++        
++        return YES;
 +    }
 +    
-+    return YES;
++    self.scrollView.panGestureRecognizer.enabled = self.scrollEnabled;
++    return NO;
 +}
 +
  @end
-+
-+
